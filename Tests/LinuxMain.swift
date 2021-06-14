@@ -16,7 +16,7 @@
 
 import XCTest
 import Glibc
-@testable import SwiftKueryPostgreSQLTests
+//@testable import SwiftKueryPostgreSQLTests
 
 // http://stackoverflow.com/questions/24026510/how-do-i-shuffle-an-array-in-swift
 extension MutableCollection {
@@ -42,16 +42,16 @@ extension Sequence {
     }
 }
 
-XCTMain([
-    testCase(TestAlias.allTests.shuffled()),
-    testCase(TestInsert.allTests.shuffled()),
-    testCase(TestJoin.allTests.shuffled()),
-    testCase(TestParameters.allTests.shuffled()),
-    testCase(TestSchema.allTests.shuffled()),
-    testCase(TestSelect.allTests.shuffled()),
-    testCase(TestSubquery.allTests.shuffled()),
-    testCase(TestTransaction.allTests.shuffled()),
-    testCase(TestTypes.allTests.shuffled()),
-    testCase(TestUpdate.allTests.shuffled()),
-    testCase(TestWith.allTests.shuffled()),
-    ].shuffled())
+// XCTMain([
+//     testCase(TestAlias.allTests.shuffled()),
+//     testCase(TestInsert.allTests.shuffled()),
+//     testCase(TestJoin.allTests.shuffled()),
+//     testCase(TestParameters.allTests.shuffled()),
+//     testCase(TestSchema.allTests.shuffled()),
+//     testCase(TestSelect.allTests.shuffled()),
+//     testCase(TestSubquery.allTests.shuffled()),
+//     testCase(TestTransaction.allTests.shuffled()),
+//     testCase(TestTypes.allTests.shuffled()),
+//     testCase(TestUpdate.allTests.shuffled()),
+//     testCase(TestWith.allTests.shuffled()),
+//     ].shuffled())

@@ -1,6 +1,6 @@
 //
 //  ODBCSQLConnection.swift
-//  
+//
 //
 //  Created by Richard Jones on 14/03/2019.
 //
@@ -21,65 +21,65 @@ enum ConnectionState {
 
 public class ODBCSQLConnection: Connection {
     var connection: UUID?
-    
+
     private var connectionParameters: String = ""
     private var dsn:String = ""
     private var username:String = ""
     private var password:String = ""
-    
+
     private var preparedStatements = Set<String>()
     private weak var currentResultFetcher: ODBCSQLResultFetcher?
-    
-    
+
+
     // MARK:Execute Handling
 
     public func execute(preparedStatement: PreparedStatement, parameters: [String : Any?], onCompletion: @escaping ((QueryResult) -> ())) {
-          print("OK 1")
+        print("OK 1")
     }
-    
+
     public func execute(preparedStatement: PreparedStatement, parameters: [Any?], onCompletion: @escaping ((QueryResult) -> ())) {
-          print("OK 2")
+        print("OK 2")
     }
-    
+
     public func execute(preparedStatement: PreparedStatement, onCompletion: @escaping ((QueryResult) -> ())) {
-          print("OK 3")
+        print("OK 3")
     }
-    
-    
+
+
     public func execute(query: Query, parameters: [Any?], onCompletion: @escaping ((QueryResult) -> ())) {
         print("OK 4")
-     }
-    
+    }
+
     private func buildQuery(_ query: Query) throws  -> String {
         // NOTE: The following call into SwiftKuery does not pack binary types
         // properly - it still uses String(describing:) instead of yielding a Data object.
         var Query = try query.build(queryBuilder: queryBuilder)
         if let insertQuery = query as? Insert, insertQuery.returnID {
             let columns = insertQuery.table.columns.filter { $0.isPrimaryKey && $0.autoIncrement }
-            
+
             if (insertQuery.suffix == nil && columns.count == 1) {
-                
+
                 // change from postgres
                 // let insertQueryReturnID = insertQuery.suffix("Returning " + columns[0].name)
-                let insertQueryReturnID = insertQuery.beforevalues("OUTPUT INSERTED." + columns[0].name)
-                
+                let insertQueryReturnID = insertQuery.suffix("OUTPUT INSERTED." + columns[0].name)
+
                 Query = try insertQueryReturnID.build(queryBuilder: queryBuilder)
             }
-            
+
             if (insertQuery.suffix != nil) {
                 throw QueryError.syntaxError("Suffix for query already set, could not add Returning suffix")
             }
         }
-        
+
         // Todo remember SQL server needs this to get a copy of the inserted record back
         /*
-        INSERT INTO files (title) VALUES ('whatever');
-        SELECT * FROM files WHERE id = SCOPE_IDENTITY();
-        */
+         INSERT INTO files (title) VALUES ('whatever');
+         SELECT * FROM files WHERE id = SCOPE_IDENTITY();
+         */
         return Query
     }
-    
-    
+
+
     /// Execute a raw query.
     ///
     /// - Parameter raw: A String with the raw query to execute.
@@ -87,7 +87,7 @@ public class ODBCSQLConnection: Connection {
     public func execute(_ raw: String, onCompletion: @escaping ((QueryResult) -> ())) {
         execute(query: raw, preparedStatement: nil, with: [Any?](), onCompletion: onCompletion)
     }
-    
+
     /// Execute a raw query with parameters.
     ///
     /// - Parameter raw: A String with the raw query to execute.
@@ -96,7 +96,7 @@ public class ODBCSQLConnection: Connection {
     public func execute(_ raw: String, parameters: [Any?], onCompletion: @escaping ((QueryResult) -> ())) {
         execute(query: raw, preparedStatement: nil, with: parameters, onCompletion: onCompletion)
     }
-    
+
     /// Execute a raw query with parameters.
     ///
     /// - Parameter raw: A String with the raw query to execute.
@@ -116,47 +116,47 @@ public class ODBCSQLConnection: Connection {
             return runCompletionHandler(.error(QueryError.syntaxError("Failed to build the query")), onCompletion: onCompletion)
         }
     }
-    
-    
+
+
     private func execute(query: String?, preparedStatement: PreparedStatement?, with parameters: [Any?], onCompletion: @escaping ((QueryResult) -> ())) {
-            guard connection != nil else {
-                return self.runCompletionHandler(.error(QueryError.connection("Connection is disconnected")), onCompletion: onCompletion)
+        guard connection != nil else {
+            return self.runCompletionHandler(.error(QueryError.connection("Connection is disconnected")), onCompletion: onCompletion)
+        }
+
+        DispatchQueue.global().async {
+
+            var torun = ""
+
+            if let _query = query    {
+                torun = _query
             }
-        
-            DispatchQueue.global().async {
-            
-                var torun = ""
-        
-                if let _query = query    {
-                    torun = _query
-                }
-        
-                if (torun == "")    {
-                    return self.runCompletionHandler(.error(QueryError.connection("Nothing To Run")), onCompletion: onCompletion)
-                }
-                print(torun)
-            
-                var hstmt:HSTMT!
-                var rc = SQLAllocStmt(self.hdbc, &hstmt)
-                if let error = self.odbcerror(rc,hstmt:hstmt) {
-                    SQLFreeStmt(hstmt,SQLUSMALLINT(SQL_DROP));
-                    return self.runCompletionHandler(.error(QueryError.databaseError(error)), onCompletion: onCompletion)
-                }
-                rc = SQLExecDirect(hstmt, torun.stringToUnsafeMutablePointer(), SQLINTEGER(torun.count));
-        
-                if let error = self.odbcerror(rc,hstmt:hstmt) {
-                    SQLFreeStmt(hstmt,SQLUSMALLINT(SQL_DROP));
-                    return self.runCompletionHandler(.error(QueryError.databaseError(error)), onCompletion: onCompletion)
-                }
-                
-                self.processQueryResult(hstmt:hstmt, query: torun, onCompletion: onCompletion)
+
+            if (torun == "")    {
+                return self.runCompletionHandler(.error(QueryError.connection("Nothing To Run")), onCompletion: onCompletion)
+            }
+            print(torun)
+
+            var hstmt:HSTMT!
+            var rc = SQLAllocStmt(self.hdbc, &hstmt)
+            if let error = self.odbcerror(rc,hstmt:hstmt) {
+                SQLFreeStmt(hstmt,SQLUSMALLINT(SQL_DROP));
+                return self.runCompletionHandler(.error(QueryError.databaseError(error)), onCompletion: onCompletion)
+            }
+            rc = SQLExecDirect(hstmt, torun.stringToUnsafeMutablePointer(), SQLINTEGER(torun.count));
+
+            if let error = self.odbcerror(rc,hstmt:hstmt) {
+                SQLFreeStmt(hstmt,SQLUSMALLINT(SQL_DROP));
+                return self.runCompletionHandler(.error(QueryError.databaseError(error)), onCompletion: onCompletion)
+            }
+
+            self.processQueryResult(hstmt:hstmt, query: torun, onCompletion: onCompletion)
         }
     }
-    
-    
+
+
     private func processQueryResult(hstmt:HSTMT!, query: String, onCompletion: @escaping ((QueryResult) -> ())) {
-        
-        
+
+
         var rc = SQLFetch(hstmt)
         // Todo need an initial check, I think
         // Todo bail if we have a problem, and free the hstmt
@@ -166,9 +166,9 @@ public class ODBCSQLConnection: Connection {
         }
     }
 
-    
+
     // MARK:Initilisation
-    
+
     /// Init with a set of connectionparameters
     ///
     /// - Parameter connectionParameters: Takes the form
@@ -177,7 +177,7 @@ public class ODBCSQLConnection: Connection {
         self.connectionParameters = connectionParameters
         queryBuilder = ODBCSQLConnection.createQueryBuilder()
     }
-    
+
     /// Init with a set of connectionparameters
     ///
     /// - Parameter dsn: Data Source Name
@@ -187,10 +187,10 @@ public class ODBCSQLConnection: Connection {
         self.dsn = dsn
         self.username = username
         self.password = password
-        
+
         queryBuilder = ODBCSQLConnection.createQueryBuilder()
     }
-    
+
     // MARK:Pools
 
     /// Create a connection pool.
@@ -202,7 +202,7 @@ public class ODBCSQLConnection: Connection {
         //let connectionParameters = extractConnectionParameters(host: host, port: port, options: options)
         return createPool( connectionParameters, options: poolOptions)
     }
-    
+
     private static func createPool(_ connectionParameters: String, options: ConnectionPoolOptions) -> ConnectionPool {
         let connectionGenerator: () -> Connection? = {
             let connection = ODBCSQLConnection(connectionParameters: connectionParameters)
@@ -215,15 +215,15 @@ public class ODBCSQLConnection: Connection {
             }
             print("Connected Through Pool")
             return connection
-            
-            }
+
+        }
         let connectionReleaser: (_ connection: Connection) -> () = { connection in
             connection.closeConnection()
         }
-        
+
         return ConnectionPool(options: options, connectionGenerator: connectionGenerator, connectionReleaser: connectionReleaser)
-        }
-    
+    }
+
     // TODO Not touched yet
     private static func createQueryBuilder() -> QueryBuilder {
         let queryBuilder = QueryBuilder(withDeleteRequiresUsing: true, withUpdateRequiresFrom: true, columnBuilder: ODBCSQLColumnBuilder())
@@ -234,52 +234,52 @@ public class ODBCSQLConnection: Connection {
                                           QueryBuilder.QuerySubstitutionNames.namedParameter : "",
                                           QueryBuilder.QuerySubstitutionNames.double : "double precision",
                                           QueryBuilder.QuerySubstitutionNames.uuid : "uuid"
-            ])
+                                         ])
         return queryBuilder
     }
-    
+
     public var queryBuilder: QueryBuilder
-    
+
     // MARK:Connections
     public func connect(onCompletion: @escaping (QueryResult) -> ()) {
-        
+
         if self.connectionParameters == ""  && self.dsn == "" {
             return self.runCompletionHandler(.error(QueryError.connection("No connection parameters.")), onCompletion: onCompletion)
         }
         DispatchQueue.global().async {
             self.odbcinitalise()
-            
-            
+
+
             let sqlPointer = UnsafeMutablePointer<UInt8>.allocate(capacity: self.MAX_DATA)
             var rc:SQLRETURN = 0
             if self.dsn != ""    {  // Connect through a DSN
                 rc = CunixODBC.SQLConnectA(self.hdbc
-                    , self.dsn.stringToUnsafeMutablePointer()
-                    , SQLSMALLINT(SQL_NTS)
-                    , self.username.stringToUnsafeMutablePointer()
-                    , self.username.lengthint16
-                    , self.password.stringToUnsafeMutablePointer()
-                    , self.password.lengthint16)
+                                          , self.dsn.stringToUnsafeMutablePointer()
+                                          , SQLSMALLINT(SQL_NTS)
+                                          , self.username.stringToUnsafeMutablePointer()
+                                          , self.username.lengthint16
+                                          , self.password.stringToUnsafeMutablePointer()
+                                          , self.password.lengthint16)
             }   else    {
                 var connouta:Int16 = 0
                 rc = CunixODBC.SQLDriverConnect(self.hdbc
-                    ,nil
-                    , self.connectionParameters.stringToUnsafeMutablePointer()
-                    , self.connectionParameters.lengthint16
-                    , sqlPointer
-                    ,SQLSMALLINT(self.MAX_DATA),&connouta,0)
+                                               ,nil
+                                               , self.connectionParameters.stringToUnsafeMutablePointer()
+                                               , self.connectionParameters.lengthint16
+                                               , sqlPointer
+                                               ,SQLSMALLINT(self.MAX_DATA),&connouta,0)
             }
             sqlPointer.deallocate()
-            
+
             if let error = self.odbcerror(rc)  {
                 return self.runCompletionHandler(.error(QueryError.connection(error)), onCompletion: onCompletion)
             }
             self.connection = UUID.init()
-            
+
             return self.runCompletionHandler(.successNoData, onCompletion: onCompletion)
         }
     }
-    
+
     public func connectSync() -> QueryResult {
         var result: QueryResult? = nil
         let semaphore = DispatchSemaphore(value: 0)
@@ -293,89 +293,89 @@ public class ODBCSQLConnection: Connection {
         }
         return resultUnwrapped
     }
-    
+
     public func closeConnection() {
-            SQLDisconnect(hdbc)
-            SQLFreeConnect(hdbc)
-            SQLFreeEnv(henv)
-            connection = nil
-    
+        SQLDisconnect(hdbc)
+        SQLFreeConnect(hdbc)
+        SQLFreeEnv(henv)
+        connection = nil
+
         print("Disconnected")
     }
-    
+
     public var isConnected: Bool    {
         get { return connection != nil }
     }
-    
+
     // MARK:Prepares
 
     public func prepareStatement(_ query: Query, onCompletion: @escaping ((QueryResult) -> ())) {
-        
+
     }
-    
+
     public func prepareStatement(_ raw: String, onCompletion: @escaping ((QueryResult) -> ())) {
-        
+
     }
-    
+
     public func release(preparedStatement: PreparedStatement, onCompletion: @escaping ((QueryResult) -> ())) {
-        
+
     }
-    
+
     public func descriptionOf(query: Query) throws -> String {
-       return try query.build(queryBuilder: queryBuilder)
+        return try query.build(queryBuilder: queryBuilder)
     }
-    
+
     // MARK:Transactions
 
     public func startTransaction(onCompletion: @escaping ((QueryResult) -> ())) {
-        
+
     }
-    
+
     public func commit(onCompletion: @escaping ((QueryResult) -> ())) {
-        
+
     }
-    
+
     public func rollback(onCompletion: @escaping ((QueryResult) -> ())) {
-        
+
     }
-    
+
     public func create(savepoint: String, onCompletion: @escaping ((QueryResult) -> ())) {
-        
+
     }
-    
+
     public func rollback(to savepoint: String, onCompletion: @escaping ((QueryResult) -> ())) {
-        
+
     }
-    
+
     public func release(savepoint: String, onCompletion: @escaping ((QueryResult) -> ())) {
-        
+
     }
 
     // MARK:ODBC Lowl Level
 
     private var henv:SQLHENV! // Environment
     private var hdbc:SQLHDBC! // Connection Handle
-   
+
     private let MAX_DATA = 100
-  
+
     private func odbcerror(_ rc:SQLRETURN,hstmt:HSTMT! = nil)-> String!
     {
         if rc == SQL_SUCCESS || rc == SQL_SUCCESS_WITH_INFO { return nil }
-       
+
         var errorout="";
         var nativeerror:Int32 = 0
         var sqlstate:UInt8 = 0
-        
+
         let messagetext = UnsafeMutablePointer<UInt8>.allocate(capacity: Int(SQL_MAX_MESSAGE_LENGTH) + 1)
         defer { messagetext.deallocate() }
-        
+
         var messagelength:SQLSMALLINT! = 0
         while SQLError(henv,hdbc,hstmt,&sqlstate,&nativeerror, messagetext,SQLSMALLINT(SQL_MAX_MESSAGE_LENGTH),&messagelength) == SQL_SUCCESS
         {
             var line = "Error: "
             line += "State=\(sqlstate) "
             line += "Native Error=\(nativeerror) "
-            
+
             let sqlmsg = Data(bytes: messagetext, count: Int(messagelength))
             if let data = String(data: sqlmsg, encoding: .utf8)    {
                 line += "\(data)"
@@ -383,10 +383,10 @@ public class ODBCSQLConnection: Connection {
             if errorout.count > 0 { errorout += "\r\n" }
             errorout += line
         }
-    print(errorout)
+        print(errorout)
         return errorout
     }
-    
+
     private func odbcinitalise()
     {
         CunixODBC.SQLAllocEnv(&henv)
@@ -400,13 +400,13 @@ class ODBCSQLColumnBuilder: ColumnCreator {
         guard let type = column.type else {
             return nil
         }
-        
+
         var result = column.name
         let identifierQuoteCharacter = queryBuilder.substitutions[QueryBuilder.QuerySubstitutionNames.identifierQuoteCharacter.rawValue]
         if !result.hasPrefix(identifierQuoteCharacter) {
             result = identifierQuoteCharacter + result + identifierQuoteCharacter + " "
         }
-        
+
         var typeString = type.create(queryBuilder: queryBuilder)
         if let length = column.length {
             typeString += "(\(length))"
@@ -420,7 +420,7 @@ class ODBCSQLColumnBuilder: ColumnCreator {
         } else {
             result += typeString
         }
-        
+
         if column.isPrimaryKey {
             result += " PRIMARY KEY"
         }
@@ -447,7 +447,7 @@ class ODBCSQLColumnBuilder: ColumnCreator {
         }
         return result
     }
-    
+
     func getAutoIncrementType(for type: String) -> String? {
         switch type {
         case "smallint":
@@ -460,14 +460,14 @@ class ODBCSQLColumnBuilder: ColumnCreator {
             return nil
         }
     }
-    
+
     func packType(_ item: Any, queryBuilder: QueryBuilder) throws -> String {
         switch item {
         case let val as String:
             return "'\(val)'"
         case let val as Bool:
             return val ? queryBuilder.substitutions[QueryBuilder.QuerySubstitutionNames.booleanTrue.rawValue]
-                : queryBuilder.substitutions[QueryBuilder.QuerySubstitutionNames.booleanFalse.rawValue]
+              : queryBuilder.substitutions[QueryBuilder.QuerySubstitutionNames.booleanFalse.rawValue]
         case let val as Parameter:
             return try val.build(queryBuilder: queryBuilder)
         case let value as Date:
